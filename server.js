@@ -8,7 +8,13 @@ app.use(cors());
 app.use(express.json());
 
 const client = new Client({
-    authStrategy: new LocalAuth()
+    authStrategy: new LocalAuth({
+        dataPath: './session_data'   
+    }),
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
 
 client.on('qr', qr => {
@@ -20,13 +26,14 @@ client.on('ready', () => {
     console.log('WhatsApp sudah siap digunakan!');
 });
 
-client.on('disconnected', () => {
-    console.log('WhatsApp terputus. Jalankan ulang server.js');
+client.on('disconnected', (reason) => {
+    console.log('WhatsApp terputus:', reason);
+    console.log('Mencoba reconnect...');
+    client.initialize();
 });
 
 client.initialize();
 
-// API untuk kirim pesan dari Laravel
 app.post('/send-message', async (req, res) => {
     const { phone, message } = req.body;
 
@@ -38,7 +45,7 @@ app.post('/send-message', async (req, res) => {
         await client.sendMessage(`${phone}@c.us`, message);
         return res.status(200).json({ success: true, message: 'Pesan berhasil dikirim!' });
     } catch (err) {
-        console.error(err);
+        console.error('Send error:', err);
         return res.status(500).json({ success: false, error: err.message });
     }
 });
